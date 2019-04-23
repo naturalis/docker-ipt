@@ -1,0 +1,52 @@
+version: '3.4'
+
+x-logging:
+  &default-logging
+  options:
+    max-size: '10m'
+    max-file: '5'
+  driver: json-file
+
+services:
+  ipt:
+    image: ${IPT_IMAGE:-gbif/ipt:2.3.5}
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE_1:-lampdb}
+      MYSQL_USER: ${MYSQL_USER_1:-db_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD_1:-blablabla}
+    ports:
+      - 8080:8080
+    labels:
+      - "traefik.backend=naturalis-ipt"
+      - "traefik.enable=true"
+      - "traefik.port=8080"
+      - "${SITE_URL:-traefik.frontend.rule=Host:ipt.site.nl}"
+    volumes:
+      - ${BASE_PATH:-/data}/ipt:/usr/local/ipt
+    networks:
+      - default
+
+  traefik:
+    image: traefik:1.7.10
+    container_name: traefik
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - 80:80
+      - 443:443
+      - 8081:8080
+    networks:
+      - default
+      - web
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${BASE_PATH:-/data}/traefiklogs/traefik.log:/var/log/traefik.log
+      - ${TRAEFIK_TOML_FILE:-./traefik.toml}:/traefik.toml
+      - ${CERTDIR:-/etc/letsencrypt}:/etc/letsencrypt
+
+networks:
+    default:
+    web:
+        external: true
